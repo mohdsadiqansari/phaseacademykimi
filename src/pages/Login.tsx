@@ -3,44 +3,36 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/providers/trpc";
 import { Shield } from "lucide-react";
+import { auth, googleProvider } from "@/lib/firebase";
+import { signInWithPopup } from "firebase/auth";
 
 export default function Login() {
-  const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const loginMutation = trpc.auth.login.useMutation({
+  const firebaseAuthMutation = trpc.auth.firebaseAuth.useMutation({
     onSuccess: () => {
       window.location.href = "/";
     },
     onError: (err) => {
       setError(err.message);
+      setIsLoading(false);
     }
   });
 
-  const registerMutation = trpc.auth.register.useMutation({
-    onSuccess: () => {
-      window.location.href = "/";
-    },
-    onError: (err) => {
-      setError(err.message);
-    }
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
     setError("");
-    
-    if (isRegister) {
-      registerMutation.mutate({ email, password, name });
-    } else {
-      loginMutation.mutate({ email, password });
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const idToken = await result.user.getIdToken();
+      firebaseAuthMutation.mutate({ idToken });
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Failed to sign in with Google");
+      setIsLoading(false);
     }
   };
-
-  const isLoading = loginMutation.isPending || registerMutation.isPending;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#0A0A0A]">
@@ -50,75 +42,30 @@ export default function Login() {
             <Shield className="w-6 h-6 text-red-500" />
           </div>
           <CardTitle className="text-2xl font-bold text-white tracking-tight">
-            {isRegister ? "Enlist Now" : "System Access"}
+            System Access
           </CardTitle>
           <CardDescription className="text-zinc-400">
-            {isRegister ? "Create your operative profile" : "Enter your credentials to proceed"}
+            Authenticate with your Google account to proceed
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-            {isRegister && (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="Operative Name"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 bg-[#0A0A0A] border border-white/10 rounded-lg text-white placeholder:text-zinc-600 focus:border-red-500 focus:outline-none transition-colors"
-                />
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <input
-                type="email"
-                placeholder="Email Address"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-[#0A0A0A] border border-white/10 rounded-lg text-white placeholder:text-zinc-600 focus:border-red-500 focus:outline-none transition-colors"
-              />
+        <CardContent className="space-y-4 pt-4">
+          <Button
+            onClick={handleGoogleLogin}
+            disabled={isLoading}
+            className="w-full py-6 text-lg bg-white hover:bg-zinc-200 text-black font-medium transition-colors flex items-center justify-center gap-3"
+          >
+            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+            {isLoading ? "Authenticating..." : "Sign in with Google"}
+          </Button>
+
+          {error && (
+            <div className="text-red-500 text-sm text-center bg-red-500/10 py-3 rounded-lg border border-red-500/20">
+              {error}
             </div>
+          )}
 
-            <div className="space-y-2">
-              <input
-                type="password"
-                placeholder="Password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-[#0A0A0A] border border-white/10 rounded-lg text-white placeholder:text-zinc-600 focus:border-red-500 focus:outline-none transition-colors"
-              />
-            </div>
-
-            {error && (
-              <div className="text-red-500 text-sm text-center bg-red-500/10 py-2 rounded">
-                {error}
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-6 text-lg bg-red-600 hover:bg-red-700 text-white font-medium transition-colors mt-2"
-            >
-              {isLoading ? "Processing..." : isRegister ? "Initialize Profile" : "Authenticate"}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-zinc-500">
-            {isRegister ? "Already have access?" : "Need an operative profile?"}{" "}
-            <button
-              onClick={() => {
-                setIsRegister(!isRegister);
-                setError("");
-              }}
-              className="text-red-500 hover:text-red-400 font-medium transition-colors"
-            >
-              {isRegister ? "Authenticate here" : "Enlist here"}
-            </button>
+          <div className="mt-6 text-center text-xs text-zinc-500 uppercase tracking-widest">
+            Secured via Firebase Authentication
           </div>
         </CardContent>
       </Card>
